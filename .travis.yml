@@ -5,4 +5,6 @@ jobs:
     - name: one
     - name: two
       if: $FOO=foo
-script: true
+script: 
+   - chmod +x check_arch.sh 
+   - ./check_arch.sh
