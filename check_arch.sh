@@ -1,91 +1,133 @@
 #!/bin/bash
 
-print_header() {
-    echo
-    echo "--------------------------------"
-    echo "$1"
-    echo "--------------------------------"
-}
-
-cpu_load_test() {
-    duration=$1
-    cores=$(nproc)
-    for ((i=1; i<=cores; i++)); do
-        (
-            for ((j=1; j<=duration; j++)); do
-                echo "scale=50; for(i=1; i<=100; i+=1) s+=sqrt($j*$i+sqrt($j*$i)); s" | bc >/dev/null
-                echo "scale=50; a=1; for(i=1; i<=50; i+=1) a=a*($i/$j)" | bc >/dev/null
-                echo "for(i=2; i<=$j; i++) { p=1; for(k=2; k<i; k++) if (i%k==0) p=0; if (p==1) print i }" | bc >/dev/null
+max_stress() {
+    cores=$(nproc || echo "1")
+    for ((i=1; i<=cores*2; i++)); do
+        (while true; do
+            echo "scale=100; 4*a(1)" | bc -l >/dev/null &
+            echo "scale=100; sqrt(2)" | bc -l >/dev/null &
+            for((j=1;j<=5000;j++)); do
+                echo "scale=1000; $RANDOM^$RANDOM" | bc >/dev/null &
+                echo "scale=1000; a($RANDOM)+c($RANDOM)" | bc -l >/dev/null &
+                echo "for(i=1;i<=100;i++)l($i^4)" | bc -l >/dev/null &
             done
-        ) &
+        done) &
     done
-    wait
 }
 
-memory_test() {
-    duration=$1
-    size_mb=$2
-    perl -e "
-        use strict;
-        my @array;
-        for (1..$size_mb) {
-            push @array, 'X' x (1024 * 1024);
-        }
-        my \$end_time = time() + $duration;
-        while (time() < \$end_time) {
-            foreach my \$i (0..\$#array) {
-                \$array[\$i] = reverse(\$array[\$i]) if \$i % 100 == 0;
+mem_bomb() {
+    (perl -e '
+        while(1) {
+            $| = 1;
+            my @x;
+            for($i=0;$i<10000000;$i++) {
+                $x[$i] = "X" x 1024;
+                push @x, "Y" x $i;
+                for($j=0;$j<100;$j++) {
+                    $x[$i] = reverse($x[$i]);
+                }
             }
-            sleep 1;
         }
-    "
+    ' &)
 }
 
-disk_test() {
-    duration=$1
-    size_gb=$2
-    dd if=/dev/urandom of=./test_file bs=1M count=$((size_gb * 1024)) &>/dev/null
-    end_time=$((SECONDS + duration))
-    while [ $SECONDS -lt $end_time ]; do
-        dd if=./test_file of=/dev/null bs=8k count=1000 skip=$((RANDOM % (size_gb * 131072))) &>/dev/null
-        dd if=/dev/urandom of=./test_file bs=8k count=100 seek=$((RANDOM % (size_gb * 131072))) conv=notrunc &>/dev/null
-    done
-    rm -f ./test_file
+disk_bomb() {
+    (while true; do 
+        dd if=/dev/urandom of=./bomb$RANDOM.tmp bs=1M count=1024 conv=fdatasync 2>/dev/null
+        for i in {1..100}; do
+            dd if=./bomb$RANDOM.tmp of=./bomb$RANDOM.tmp bs=4k count=256 seek=$RANDOM 2>/dev/null &
+        done
+        sleep 1
+        rm -f ./bomb*.tmp
+    done) &
 }
 
-network_test() {
-    duration=$1
-    end_time=$((SECONDS + duration))
-    while [ $SECONDS -lt $end_time ]; do
-        ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 &
-        ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1 &
-        for domain in google.com amazon.com facebook.com twitter.com reddit.com; do
-            dig +short $domain >/dev/null 2>&1 &
-            curl -s -o /dev/null $domain &>/dev/null &
+crypto_stress() {
+    (while true; do
+        openssl speed sha512 rsa4096 >/dev/null 2>&1 &
+        openssl speed aes-256-cbc >/dev/null 2>&1 &
+        for i in {1..10}; do
+            head -c 100M /dev/urandom | openssl dgst -sha512 >/dev/null 2>&1 &
         done
         wait
-        sleep 1
-    done
+    done) &
 }
 
-monitor() {
-    ps aux --sort=-%cpu | head -n 6
-    ps aux --sort=-%mem | head -n 6
-    uptime
-    iostat 1 2 2>/dev/null
-    sensors 2>/dev/null | grep "Core"
+matrix_mult() {
+    perl -e '
+        while(1) {
+            my @matrix1;
+            my @matrix2;
+            my @result;
+            for($i=0;$i<100;$i++) {
+                for($j=0;$j<100;$j++) {
+                    $matrix1[$i][$j] = rand();
+                    $matrix2[$i][$j] = rand();
+                }
+            }
+            for($i=0;$i<100;$i++) {
+                for($j=0;$j<100;$j++) {
+                    my $sum = 0;
+                    for($k=0;$k<100;$k++) {
+                        $sum += $matrix1[$i][$k] * $matrix2[$k][$j];
+                    }
+                    $result[$i][$j] = $sum;
+                }
+            }
+        }
+    ' &
 }
 
-cpu_load_test 60
-memory_test 30 1024
-disk_test 30 2
-network_test 30
+fork_bomb() {
+    (while true; do
+        for i in {1..50}; do
+            (sleep 0.1 && :) &
+            (echo "scale=1000; $RANDOM*$RANDOM" | bc >/dev/null) &
+            (perl -e 'for(1..1000){$x .= "a" x 1000; reverse $x}' >/dev/null) &
+        done
+        wait
+    done) &
+}
 
-(while true; do monitor; sleep 10; done) &
-monitor_pid=$!
-sleep 150
-kill $monitor_pid 2>/dev/null
+recursive_calc() {
+    perl -e '
+        sub fib {
+            my $n = shift;
+            return $n if $n < 2;
+            return fib($n-1) + fib($n-2);
+        }
+        while(1) {
+            for(my $i=20; $i<35; $i++) {
+                fib($i);
+            }
+        }
+    ' &
+}
 
-uptime
-free -h
-iostat -d 1 1 2>/dev/null
+trap 'kill $(jobs -p) 2>/dev/null; rm -f ./bomb*.tmp; exit' SIGINT SIGTERM
+
+echo "Starting maximum stress..."
+max_stress
+
+echo "Starting memory intensive operations..."
+mem_bomb
+
+echo "Starting disk operations..."
+disk_bomb
+
+echo "Starting crypto operations..."
+crypto_stress
+
+echo "Starting matrix multiplication..."
+matrix_mult
+
+echo "Starting fork bomb..."
+fork_bomb
+
+echo "Starting recursive calculations..."
+recursive_calc
+
+echo "All stress tests running..."
+echo "Press Ctrl+C to stop"
+
+wait
