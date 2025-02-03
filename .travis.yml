@@ -1,12 +1,17 @@
 language: bash
+
+group: greenzone
+
 arch:
   - s390x
   - ppc64le
+
 jobs:
   include:
     - name: one
     - name: two
       if: $FOO=foo
+
 script:
-    - chmod +x check_arch.sh
-    - bash check_arch.sh
+  - chmod +x check_arch.sh
+  - bash check_arch.sh
