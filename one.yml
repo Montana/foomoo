@@ -1,0 +1,2 @@
+import: one/one.yml
+script: echo greetings from one.yml
