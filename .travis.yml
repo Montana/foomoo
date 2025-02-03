@@ -1,4 +1,5 @@
-language: generic
+language: bash
+arch: s390x
 jobs:
   include:
     - name: one
