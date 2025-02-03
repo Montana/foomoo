@@ -7,6 +7,26 @@ print_header() {
     echo "--------------------------------"
 }
 
+cpu_load_test() {
+    duration=$1
+    cores=$(nproc)
+    print_header "Running CPU Load Test"
+    echo "Duration: $duration seconds"
+    echo "Number of cores: $cores"
+    echo "Starting test..."
+    
+    for ((i=1; i<=cores; i++)); do
+        (
+            for ((j=1; j<=duration; j++)); do
+                echo "scale=10; sqrt($j*$j*$j*$j)" | bc >/dev/null
+            done
+        ) &
+    done
+    
+    wait
+    echo "CPU load test completed"
+}
+
 print_header "System Architecture Information"
 echo "OS Type           : $(uname -s)"
 echo "Kernel Version    : $(uname -r)"
@@ -36,5 +56,7 @@ elif command -v dnf &> /dev/null; then
 else
     echo "Package manager not detected or unsupported."
 fi
+
+cpu_load_test 30
 
 print_header "Completed System Check"
