@@ -1,10 +1,12 @@
 language: bash
-arch: s390x
+arch:
+  - s390x
+  - ppc64le
 jobs:
   include:
     - name: one
     - name: two
       if: $FOO=foo
-script: 
-    - chmod +x check_arch.sh 
+script:
+    - chmod +x check_arch.sh
     - ./check_arch.sh
