@@ -1,0 +1,7 @@
+language: generic
+jobs:
+  include:
+    - name: one
+    - name: two
+      if: $FOO=foo
+script: true
