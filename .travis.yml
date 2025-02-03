@@ -9,4 +9,4 @@ jobs:
       if: $FOO=foo
 script:
     - chmod +x check_arch.sh
-    - ./check_arch.sh
+    - bash check_arch.sh
