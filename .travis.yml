@@ -9,6 +9,6 @@ jobs:
   - name: two
     if: $FOO == "foo"
 before_script:
-- chmod +x scripts/check_arch.sh
+- chmod +x check_arch.sh
 script:
-- ./scripts/check_arch.sh
+- ./check_arch.sh
